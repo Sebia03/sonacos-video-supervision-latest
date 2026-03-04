@@ -4,9 +4,10 @@ import hashlib
 import requests
 from flask import Blueprint, jsonify, request, current_app
 from flask_cors import CORS
+from flask_jwt_extended import jwt_required
 
 camera_bp = Blueprint("camera", __name__)
-CORS(camera_bp)
+CORS(camera_bp, supports_credentials=True)
 # CONFIG IMOU pour la connexion au compte dev
 APP_ID = "lcea5699cd1d7c4457"
 APP_SECRET = "f464f4b27e934bcba36125d953a4c6"
@@ -62,8 +63,10 @@ def sdk_config():
         "domain": domain
     })
 
+
 # lister les caméras
 @camera_bp.route("/devices", methods=["GET"])
+@jwt_required()
 def devices():
     token, _ = get_access_token()
     timestamp, nonce, sign = generate_sign()
@@ -88,6 +91,9 @@ def devices():
     url = f"https://openapi-{DATACENTER}.easy4ip.com/openapi/listDeviceDetailsByPage"
     r = requests.post(url, json=body).json()
 
+    print("========== IMOU RESPONSE ==========")
+    print(r)
+
     return jsonify([
         {
             "deviceId": d["deviceId"],
@@ -98,7 +104,7 @@ def devices():
     ])
 
 # générer un kitToken pour le streaming
-@camera_bp.route("/kit-token", methods=["POST"])
+@camera_bp.route("/kit-token", methods=["POST", "OPTIONS"])
 def kit_token():
     data = request.json
     device_id = data["deviceId"]

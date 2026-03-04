@@ -1,9 +1,11 @@
 
 from blueprint.camera import camera_bp
 from utils.error_class import CheckError
+from blueprint.auth import auth_bp
 
 BLUEPRINTS = [
     camera_bp,
+    auth_bp
 ]
 
 def register_routes(app):
