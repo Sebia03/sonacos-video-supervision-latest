@@ -1,16 +1,17 @@
+import os
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
     create_access_token,
     set_access_cookies,
     unset_jwt_cookies,
+    jwt_required,
+    get_jwt_identity,
+    get_jwt,
 )
 from datetime import timedelta
-import os
+from database import get_user_by_email, verify_password
 
 auth_bp = Blueprint("auth", __name__)
-
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 
 # ==========================
@@ -23,26 +24,40 @@ def login():
     if not data:
         return jsonify({"error": "Missing JSON body"}), 400
 
-    username = data.get("username")
+    email    = data.get("email") or data.get("username")
     password = data.get("password")
 
-    if not username or not password:
-        return jsonify({"error": "Username and password required"}), 400
+    if not email or not password:
+        return jsonify({"error": "Email et mot de passe requis"}), 400
 
-    # Vérification des identifiants admin
-    if username != ADMIN_USERNAME or password != ADMIN_PASSWORD:
-        return jsonify({"error": "Invalid credentials"}), 401
+    user = get_user_by_email(email)
 
-    # Création du token (expire en 2h)
+    if not user or not verify_password(password, user["password"]):
+        return jsonify({"error": "Identifiants invalides"}), 401
+
+    # Token avec role et site dans les claims
+    additional_claims = {
+        "role": user["role"],
+        "site": user["site"],
+        "email": user["email"],
+    }
+
     access_token = create_access_token(
-        identity="admin",
+        identity=str(user["id"]),
+        additional_claims=additional_claims,
         expires_delta=timedelta(hours=2),
     )
 
-    # Réponse avec cookie HTTP-only
-    response = jsonify({"message": "Login successful"})
+    response = jsonify({
+        "message": "Login successful",
+        "user": {
+            "id":    user["id"],
+            "email": user["email"],
+            "role":  user["role"],
+            "site":  user["site"],
+        }
+    })
     set_access_cookies(response, access_token)
-
     return response, 200
 
 
@@ -54,3 +69,18 @@ def logout():
     response = jsonify({"message": "Logout successful"})
     unset_jwt_cookies(response)
     return response, 200
+
+
+# ==========================
+# 👤 MOI (profil connecté)
+# ==========================
+@auth_bp.route("/me", methods=["GET"])
+@jwt_required()
+def me():
+    claims = get_jwt()
+    return jsonify({
+        "id":    get_jwt_identity(),
+        "email": claims.get("email"),
+        "role":  claims.get("role"),
+        "site":  claims.get("site"),
+    })

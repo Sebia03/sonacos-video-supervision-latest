@@ -9,6 +9,14 @@ def init_cors(app):
         return response
 
     CORS(app, resources={
-        r"/image-proxy": {"origins": "*"},  # pas de credentials pour les images
-        r"/*": {"origins": "http://localhost:5173", "supports_credentials": True}
+        r"/image-proxy": {"origins": "*"},
+        r"/*": {
+            "origins": [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:5000",
+                "http://127.0.0.1:5000"
+            ],
+            "supports_credentials": True
+        }
     })
